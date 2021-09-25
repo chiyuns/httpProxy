@@ -21,62 +21,47 @@ using namespace std;
 
 #define  REDIS_EXPIRE_TIME    3600
 
-ZRedisConnection::ZRedisConnection()
+ZRedisConnection::ZRedisConnection(const  RedisCfgInfo& redisCfgInfo)
 {
-
+	m_redisCfgInfo = redisCfgInfo;
+	m_pContext = NULL;
 }
 
 
 ZRedisConnection :: ~ZRedisConnection()
 {
-    redisClusterFree(cc);
-}
-
-bool ZRedisConnection::Connect(const std::string& strRedisAddr, const std::string& strRedisPwd, struct timeval timeout)
-{	
-	cc = redisClusterContextInit();
-    redisClusterSetOptionAddNodes(cc, strRedisAddr.c_str());
-    string  strDecryPwd = DecryptPass(strRedisPwd);
-	redisClusterSetOptionPassword(cc, strDecryPwd.c_str());
-    redisClusterSetOptionConnectTimeout(cc, timeout);
-    redisClusterSetOptionRouteUseSlots(cc);
-    redisClusterConnect2(cc);
-    if (cc && cc->err) {
-		LOGERR("Error: %s", cc->errstr);
-	   return false;
-    }
-	m_strRedisAddr  = strRedisAddr;
-	m_strRedisPwd   = strDecryPwd;
-	m_timeout       = timeout;
-	return true;
-}
-
-
-//重新连接
-bool ZRedisConnection::ReConnect()
-{
-	if(cc != NULL)
+	if (m_pContext) 
 	{
-	    redisClusterFree(cc);
-        cc = NULL;
+		redisClusterFree(m_pContext);
+		m_pContext = NULL;
 	}
-	
-	cc = redisClusterContextInit();
-    redisClusterSetOptionAddNodes(cc, m_strRedisAddr.c_str());
-	redisClusterSetOptionPassword(cc, m_strRedisPwd.c_str());
-    redisClusterSetOptionConnectTimeout(cc, m_timeout);
-    redisClusterSetOptionRouteUseSlots(cc);
-    redisClusterConnect2(cc);
-    if (cc && cc->err) 
+}
+
+bool ZRedisConnection::Connect()
+{	
+
+	struct timeval timeout;
+	timeout.tv_sec = m_redisCfgInfo.iRedisTimeOut;
+	timeout.tv_usec =0; 
+
+	m_pContext = redisClusterContextInit();
+    redisClusterSetOptionAddNodes(m_pContext, m_redisCfgInfo.strRedisAddr.c_str());
+    string  strDecryPwd = DecryptPass(m_redisCfgInfo.strRedisPwd);
+	redisClusterSetOptionPassword(m_pContext, strDecryPwd.c_str());
+    redisClusterSetOptionConnectTimeout(m_pContext, timeout);
+    redisClusterSetOptionRouteUseSlots(m_pContext);
+    redisClusterConnect2(m_pContext);
+    if (m_pContext && m_pContext->err) 
 	{
-       LOGERR("Error: %s", cc->errstr);
+	   LOGERR("Error: %s", m_pContext->errstr);
 	   return false;
     }
 	return true;
 }
 
 
-bool ZRedisConnection::onlineHmset(const string& key,const std::map<std::string,string>& value)
+
+bool ZRedisConnection::hmset(const string& key,const std::map<std::string,string>& value)
 {
     bool bRet = false;
 
@@ -90,9 +75,9 @@ bool ZRedisConnection::onlineHmset(const string& key,const std::map<std::string,
 	std::string cmd = ss.str();
 	cout<<cmd<<endl;
 	
-	LOGDBG("hmset: %s\n", cmd.c_str());
+	LOGINFO("HMSET: %s\n", cmd.c_str());
 	
-	redisReply *reply = (redisReply *)redisClusterCommand(cc, cmd.c_str());
+	redisReply *reply = (redisReply *)redisClusterCommand(m_pContext, cmd.c_str());
 	if(CheckReply(reply))
 	{
 		bRet = true;
@@ -110,7 +95,7 @@ bool ZRedisConnection::onlineHmset(const string& key,const std::map<std::string,
 }
 
 
-bool ZRedisConnection::onlineHmget(const string& key, const vector<string>&fileds, vector<string>&contents)
+bool ZRedisConnection::hmget(const string& key, const vector<string>&fileds, vector<string>&contents)
 {
 	bool bRet = false;
 	std::stringstream ss;
@@ -121,7 +106,7 @@ bool ZRedisConnection::onlineHmget(const string& key, const vector<string>&filed
     }
 	std::string cmd = ss.str();
 	LOGDBG("HMGET: %s\n", cmd.c_str());
-	redisReply *reply = (redisReply *)redisClusterCommand(cc, cmd.c_str());
+	redisReply *reply = (redisReply *)redisClusterCommand(m_pContext, cmd.c_str());
 	if(CheckReply(reply))
 	{
 		 for (unsigned i = 0; i < reply->elements; i++) 
@@ -142,7 +127,7 @@ bool ZRedisConnection::onlineHmget(const string& key, const vector<string>&filed
 bool ZRedisConnection::onlineHset(const string& key, const string& filed, const string& val)
 {
     bool bRet = false;
-	redisReply *reply = (redisReply *)redisClusterCommand(cc, "HSET %s %s %s", key.c_str(), filed.c_str(), val.c_str() );
+	redisReply *reply = (redisReply *)redisClusterCommand(m_pContext, "HSET %s %s %s", key.c_str(), filed.c_str(), val.c_str() );
 	if(CheckReply(reply))
 	{
 		bRet = true;
@@ -204,7 +189,7 @@ void ZRedisConnection::FreeReply(const redisReply* reply)
 bool ZRedisConnection::onlineHget(const string& key, const string& filed, string& val)
 {
     bool bRet = false;
-	redisReply *reply = (redisReply *)redisClusterCommand(cc, "HGET %s %s ", key.c_str(), filed.c_str());
+	redisReply *reply = (redisReply *)redisClusterCommand(m_pContext, "HGET %s %s ", key.c_str(), filed.c_str());
 	if(CheckReply(reply))
 	{
 		val.assign(reply->str, reply->len);
@@ -222,7 +207,7 @@ bool ZRedisConnection::onlineExists(const string& key)
         return false;
     }
 	
-    redisReply *reply = (redisReply *)redisClusterCommand(cc, "EXISTS %s", key.c_str());
+    redisReply *reply = (redisReply *)redisClusterCommand(m_pContext, "EXISTS %s", key.c_str());
 	if(CheckReply(reply))
 	{
 		bRet = true;
@@ -246,7 +231,7 @@ bool ZRedisConnection::onlineDel(const string& key)
         return false;
     }
 
-    redisReply *reply = (redisReply *)redisClusterCommand(cc, "DEL %s", key.c_str());
+    redisReply *reply = (redisReply *)redisClusterCommand(m_pContext, "DEL %s", key.c_str());
 	 if (CheckReply(reply)) 
 	 {
         if (REDIS_REPLY_STATUS == reply->type) 
@@ -263,28 +248,12 @@ bool ZRedisConnection::onlineDel(const string& key)
 }
 
 
-bool ZRedisConnection::Ping()
-{
-	bool bRet = false;
-    redisReply *reply = (redisReply *)redisClusterCommand(cc, "PING");
-	cout<<"ping-------"<<endl;
-	if (CheckReply(reply)) 
-	 {
-		cout<<"ping success-------"<<endl;
-		bool bRet = (NULL != reply) && (reply->str) && (strcasecmp(reply->str, "PONG") == 0);
-		if(bRet)
-		{
-			cout<<"ping success"<<endl;
-			FreeReply(reply);
-		}
-	 }
-    return bRet;
-}
+
 
 bool ZRedisConnection::expire(const std::string& key,  uint32_t second)
 {
 	bool bRet  = false;
-	redisReply *reply = (redisReply *)redisClusterCommand(cc,  "EXPIRE %s %u", key.c_str(), second);
+	redisReply *reply = (redisReply *)redisClusterCommand(m_pContext,  "EXPIRE %s %u", key.c_str(), second);
 	if (CheckReply(reply)) 
 	{
 		if (REDIS_REPLY_INTEGER == reply->type) 
@@ -301,7 +270,7 @@ bool ZRedisConnection::expire(const std::string& key,  uint32_t second)
 }
 
 
-//从redis中获取数据
+//��ѯ
 int ZRedisConnection::query(unsigned int uin, MMOnlineRedisResult_t& result)
 {
 	string strKey = "onRedisLine_"+ to_string(uin);	
@@ -313,9 +282,9 @@ int ZRedisConnection::query(unsigned int uin, MMOnlineRedisResult_t& result)
 	fileds.push_back("cDeviceId");
 	fileds.push_back("iClientPort");
 	vector<string>values;
-	if(!onlineHmget(strKey, fileds, values))
+	if(!hmget(strKey, fileds, values))
 	{
-		LOGERR("onlineHmget strKey:%s failed", strKey.c_str());
+		LOGERR("hmget strKey:%s failed", strKey.c_str());
 		return -1;
 	}
 	
@@ -331,7 +300,7 @@ int ZRedisConnection::query(unsigned int uin, MMOnlineRedisResult_t& result)
 }
 
 
-//插入数据到redis
+//����
 int ZRedisConnection::update(unsigned int uin, const MMOnlineRedisResult_t& result)
 {
 	string strKey = "onRedisLine_"+ to_string(uin);
@@ -342,7 +311,6 @@ int ZRedisConnection::update(unsigned int uin, const MMOnlineRedisResult_t& resu
 	mapValue.insert(pair<string, string>("iOnlineTime", result.strOnlineTime));  
 	mapValue.insert(pair<string, string>("cDeviceId", result.strDeviceId));  
 	mapValue.insert(pair<string, string>("iClientPort", result.strClientPort));  
-	onlineHmset(strKey, mapValue);
-	//expire(strKey, REDIS_EXPIRE_TIME);//设置一个过期时间
+	hmset(strKey, mapValue);
 	return 0;
 }

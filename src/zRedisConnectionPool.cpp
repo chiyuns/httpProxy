@@ -15,97 +15,93 @@
 
 
 using namespace std;
-//using Comm::RichLogErr;
 
-std::vector<std::shared_ptr<ZRedisConnection>> ZRedisConnectionPool::connect_pool_;
-std::mutex ZRedisConnectionPool::mtx_;
-int ZRedisConnectionPool::maxIdleTime_ = 2;
-
-bool ZRedisConnectionPool::init(const std::string& strRedisAddr, const std::string& strRedisPwd, struct timeval timeout, unsigned iPoolSize, unsigned maxIdleTime) 
+bool ZRedisConnectionPool::init(const  RedisCfgInfo& redisCfgInfo) 
 {
-	bool flag = true;
-	 if(iPoolSize <= 0)
-	 {
-		 flag = false;
-	 }
-	 std::unique_lock<std::mutex> lk(mtx_);
-	 for (unsigned i = 0; i < iPoolSize; ++i) {
-		 //实例化连接
-		 ZRedisConnection* con = new ZRedisConnection();
-		 if(con->Connect(strRedisAddr,strRedisPwd,timeout))
+    m_redisCfgInfo = redisCfgInfo;
+	m_curConnCnt = MIN_CACHE_CONN_CNT;
+	m_maxConnCnt = redisCfgInfo.iRedisConNum;
+
+	std::unique_lock<std::mutex> lk(mtx_);
+	for (unsigned i = 0; i < m_curConnCnt; ++i) {
+		 ZRedisConnection* pConn = new ZRedisConnection(redisCfgInfo);
+		 if(pConn->Connect())
 		 {
-			 //放入连接池
-			 connect_pool_.push_back(std::shared_ptr<ZRedisConnection>(con));
+			 connect_pool_.push_back(pConn);
 		 }else{
 			// LOG(ERROR) << "connect redirs :" <<ip << ":" << port << pwd << "failed";
+			delete pConn;
+			return false;
 		 }
 	 }
-	 unsigned real_iPoolSize = connect_pool_.size();
-	 if(iPoolSize > real_iPoolSize)
-	 {
-		 //LOG(ERROR) << "redis pool init failed! hope pool size:" << iPoolSize << "real size is " << real_iPoolSize;
-		 flag = false;
-	 }else{
-		 //LOG(INFO) << "redis pool init success! pool size:" << real_iPoolSize;
-	 }
 
-	 //创建保活线程池
-	//std::thread scanner(std::bind(&ZRedisConnectionPool::KeepAlive));
-	//scanner.detach();
-
-	maxIdleTime_  =  maxIdleTime;  
-	
-	 return flag;
+	return true;
 }
 
 
-std::shared_ptr<ZRedisConnection> ZRedisConnectionPool::Get() 
+bool ZRedisConnectionPool::unInit()
 {
-    std::unique_lock<std::mutex> lk(mtx_);
-    if(connect_pool_.size() == 0)
-    {
-        return  nullptr;
-    }
-    //从连接容器里返回一个连接
-    std::shared_ptr<ZRedisConnection> tmp = connect_pool_.front();
-    connect_pool_.erase(connect_pool_.begin());
-    return tmp;
-}
+	std::unique_lock<std::mutex> lk(mtx_);
 
-void ZRedisConnectionPool::Back(std::shared_ptr<ZRedisConnection> &con) {
-    std::unique_lock<std::mutex> lk(mtx_);
-    //归还到容器
-    connect_pool_.push_back(con);
-}
-
-int ZRedisConnectionPool::size() 
-{
-    std::unique_lock<std::mutex> lk(mtx_);
-    int size = connect_pool_.size();
-    return size;
-}
-
-//此块代码中保活ping不通，可能跟集群有关系
-void ZRedisConnectionPool::KeepAlive() 
-{
-  while (true) {
-    //定时保活
-    std::this_thread::sleep_for(std::chrono::seconds(maxIdleTime_)); //目前定为10秒保活一次
-    std::shared_ptr<ZRedisConnection> conn = ZRedisConnectionPool::Get();
-    if(conn == nullptr )
-	{
-		LOGERR("can't get connection");
-		return;
+	for (list<ZRedisConnection*>::iterator it = connect_pool_.begin(); it != connect_pool_.end(); it++) {
+		ZRedisConnection* pConn = *it;
+		delete pConn;
 	}
-	if(!conn->Ping())
+
+    connect_pool_.clear();
+	m_curConnCnt = 0;
+
+}
+
+ZRedisConnection* ZRedisConnectionPool::Get() 
+{
+    std::unique_lock<std::mutex> lk(mtx_);
+	while(connect_pool_.empty())
 	{
-		LOGERR("redis ping error");
-		if(conn->ReConnect())
+		if(m_curConnCnt >= m_maxConnCnt)
 		{
-			LOGERR("redis ReConnect success");
-			
+			m_condition.wait(lk);
+		}
+		else
+		{
+			ZRedisConnection* pConn = new ZRedisConnection(m_redisCfgInfo);
+			if(pConn->Connect())
+			{
+				connect_pool_.push_back(pConn);
+				m_curConnCnt++;
+			}else
+			{
+				delete pConn;
+				return nullptr;
+			}
+		}
+
+	}
+	
+	ZRedisConnection*  pConn = connect_pool_.front();
+	connect_pool_.pop_front();
+	
+    return pConn;
+}
+
+void ZRedisConnectionPool::Back(ZRedisConnection* pCacheConn) 
+{
+    std::unique_lock<std::mutex> lk(mtx_);
+
+	list<ZRedisConnection*>::iterator it = connect_pool_.begin();
+	for (; it != connect_pool_.end(); it++) 
+	{
+		if (*it == pCacheConn) {
+			break;
 		}
 	}
-	Back(conn);
-  }
+
+	if (it == connect_pool_.end()) 
+	{
+		connect_pool_.push_back(pCacheConn);
+	}
+
+	m_condition.notify_all();
 }
+
+

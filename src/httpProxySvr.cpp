@@ -18,41 +18,39 @@ void HttpProxyServer::init() {
   	string suid = req.get_param_value("userId");
 	int uid = atoi(suid.c_str());
 
-
    	char result[256];
-   //std::unique_lock<std::mutex> lk(m_queueMutex);	
-    std::shared_ptr<ZRedisConnection> con = ZRedisConnectionPool::Get();
-    if(con == nullptr )
-	{
-		LOGERR("can't get connection");
-		return;
-	}
-	MMOnlineRedisResult_t   redisResult;
-	int  ret = con->query(uid, redisResult);
-	if(ret != 0 )
-	{
-	   snprintf(result, sizeof(result),
-               "{\"ret\":%d,\"msg\":\"get user %d seq failed\"}", 201, uid);
-       res.set_content(result, "text/json");
-	   return;
-	}
-	ZRedisConnectionPool::Back(con);
-	int iClientIp = atoi(redisResult.strClientIp.c_str());
-	
-	struct in_addr addr1;
-    memcpy(&addr1, &iClientIp, 4);    	
-	char ipAddr[30];
-	snprintf(ipAddr,30,"%s:%s",inet_ntoa(addr1),redisResult.strClientPort.c_str());
-	
-	string strIpAddr(ipAddr);
-	
-	string strUrl ="http://";
-	strUrl += strIpAddr;
+    ZRedisConnection* pConn = Singleton<ZRedisConnectionPool>::Instance().Get();
+    if(pConn)
+    {
+		MMOnlineRedisResult_t   redisResult;
+		int  ret = pConn->query(uid, redisResult);
+		if(ret != 0 )
+		{
+		   snprintf(result, sizeof(result),
+	               "{\"ret\":%d,\"msg\":\"get user %d seq failed\"}", 201, uid);
+	       res.set_content(result, "text/json");
+		   return;
+		}
+		Singleton<ZRedisConnectionPool>::Instance().Back(pConn);
+			
+		int iClientIp = atoi(redisResult.strClientIp.c_str());
+		
+		struct in_addr addr1;
+	    memcpy(&addr1, &iClientIp, 4);    	
+		char ipAddr[30];
+		snprintf(ipAddr,30,"%s:%s",inet_ntoa(addr1),redisResult.strClientPort.c_str());
+		
+		string strIpAddr(ipAddr);
+		
+		string strUrl ="http://";
+		strUrl += strIpAddr;
 
-    snprintf(result, sizeof(result),
-             "{\"ret\":200,\"msg\":\"get user %d online status success\",\"status\":%s,\"onlineTime\":%s,\"url\":\"%s\",\"clientId\":%s,\"userId\":%d}",
-             uid, redisResult.strFlag.c_str(), redisResult.strOnlineTime.c_str(), strUrl.c_str(), redisResult.strClientId.c_str(), uid);
-    res.set_content(result, "text/json");
+	    snprintf(result, sizeof(result),
+	             "{\"ret\":200,\"msg\":\"get user %d online status success\",\"status\":%s,\"onlineTime\":%s,\"url\":\"%s\",\"clientId\":%s,\"userId\":%d}",
+	             uid, redisResult.strFlag.c_str(), redisResult.strOnlineTime.c_str(), strUrl.c_str(), redisResult.strClientId.c_str(), uid);
+	    res.set_content(result, "text/json");
+    }
+
   });
 
   m_svr.set_error_handler([](const Request & /*req*/, Response &res) {

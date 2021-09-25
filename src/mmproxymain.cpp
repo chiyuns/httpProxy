@@ -12,6 +12,7 @@
 #include "httpProxySvr.h"
 #include <signal.h>
 #include <assert.h>
+#include "Singleton.h"
 #include "iServerConfig.h"
 #include "zRedisConnectionPool.h"
 
@@ -77,10 +78,8 @@ int main(int argc, char** argv) {
 
 
 	RedisCfgInfo redisCfgInfo = objConfig.GetRedisCfgInfo();
-	struct timeval timeout;
-	timeout.tv_sec = redisCfgInfo.iRedisTimeOut;
-	timeout.tv_usec =0; 
-	ZRedisConnectionPool::init(redisCfgInfo.strRedisAddr,redisCfgInfo.strRedisPwd,timeout, redisCfgInfo.iRedisConNum);
+
+	Singleton<ZRedisConnectionPool>::Instance().init(redisCfgInfo);
 	
     try 
 	{
@@ -94,7 +93,10 @@ int main(int argc, char** argv) {
     	LOGERR("ERR: mmproxy exit");
     }
 
-    return 2;
+
+	Singleton<ZRedisConnectionPool>::Instance().unInit();
+
+    return 0;
 }
 
 //gzrd_Lib_CPP_Version_ID--start

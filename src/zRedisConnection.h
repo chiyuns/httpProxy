@@ -13,6 +13,7 @@
 #include <vector>
 #include <map>
 #include <memory>
+#include "iServerConfig.h"
 #include "hiredis_cluster/hircluster.h"
 
 using namespace std;
@@ -35,38 +36,30 @@ enum {
 
 class MMOnlineSvrConfig;
 
+class ZRedisConnectionPool;
+
 
 /**
  * 在线状态管理器
  */
 class ZRedisConnection {
 public:
-    ZRedisConnection();
+	ZRedisConnection(const  RedisCfgInfo& redisCfgInfo);
+
     ~ZRedisConnection();
 	
    
 public:
 
-	bool Connect(const std::string& strRedisAddr, const std::string& strRedisPwd, struct timeval timeout);
+	bool Connect();
 	
-	bool ReConnect();
-	 
-    /**
-     * 查询指定用户的在线状态
-     * @param uin 用户标识
-     * @param list 结果列表, 输出参数
-     */
     int query(unsigned int uin, MMOnlineRedisResult_t& result);
 
-    /**
-     * 更新状态信息
-     * @param list 状态信息列表
-     */
     int update(unsigned int uin, const MMOnlineRedisResult_t& result);
 	
-	bool onlineHmset(const string& key, const std::map<std::string,string>& value);
+	bool hmset(const string& key, const std::map<std::string,string>& value);
 	
-	bool onlineHmget(const string& key, const vector<string>&fileds, vector<string>& contents);
+	bool hmget(const string& key, const vector<string>&fileds, vector<string>& contents);
 
 	bool onlineHset(const string& key, const string& filed, const string& val);
 	
@@ -76,8 +69,6 @@ public:
 	
 	bool onlineDel(const string& key);
 
-	bool Ping();
-
 	bool CheckReply(const redisReply* reply);
 
 	void FreeReply(const redisReply* reply);
@@ -86,10 +77,7 @@ public:
 	
 	
 private:
-   redisClusterContext *cc;
-   string  m_strRedisAddr;
-   string  m_strRedisPwd;
-   struct timeval m_timeout;
-
-	
+   redisClusterContext *m_pContext;
+   RedisCfgInfo  m_redisCfgInfo;
+   
 };
