@@ -27,9 +27,11 @@ bool ZRedisConnectionPool::init(const  RedisCfgInfo& redisCfgInfo)
 		 ZRedisConnection* pConn = new ZRedisConnection(redisCfgInfo);
 		 if(pConn->Connect())
 		 {
+			 cout<<"连接成功"<<endl;
 			 connect_pool_.push_back(pConn);
-		 }else{
-			// LOG(ERROR) << "connect redirs :" <<ip << ":" << port << pwd << "failed";
+		 }else
+		 {
+			cout<<"连接失败"<<endl;
 			delete pConn;
 			return false;
 		 }

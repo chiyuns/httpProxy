@@ -2,13 +2,12 @@
  *
  * File:        OnlineManager.h
  * Author:      iotazhang
- * Revision:    $Id: OnlineManager.h 328249 2012-07-24 07:26:44Z dirkcai $
+ * Revision:    主要是用于redis访问连接池
  * Description: 在线状态管理器, 记录一个mmproxy上所有客户端的在线状态
  *
  ***********************************************************************/
 
 #pragma once
-//#include "sk_mmonlinestruct.h"
 #include <string>
 #include <vector>
 #include <map>
@@ -26,12 +25,6 @@ typedef struct tagMMOnlineRedisResult {
 	std::string  strClientPort;
 	std::string  strOnlineTime;
 } MMOnlineRedisResult_t;
-
-
-enum {
-    CACHE_TYPE_1,
-    CACHE_TYPE_MAX,
-};
 
 
 class MMOnlineSvrConfig;

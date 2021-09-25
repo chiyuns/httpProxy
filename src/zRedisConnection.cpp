@@ -19,8 +19,6 @@
 
 using namespace std;
 
-#define  REDIS_EXPIRE_TIME    3600
-
 ZRedisConnection::ZRedisConnection(const  RedisCfgInfo& redisCfgInfo)
 {
 	m_redisCfgInfo = redisCfgInfo;
@@ -105,7 +103,7 @@ bool ZRedisConnection::hmget(const string& key, const vector<string>&fileds, vec
 		ss << (*iter) << " ";
     }
 	std::string cmd = ss.str();
-	LOGDBG("HMGET: %s\n", cmd.c_str());
+	LOGINFO("HMGET: %s\n", cmd.c_str());
 	redisReply *reply = (redisReply *)redisClusterCommand(m_pContext, cmd.c_str());
 	if(CheckReply(reply))
 	{
@@ -270,7 +268,7 @@ bool ZRedisConnection::expire(const std::string& key,  uint32_t second)
 }
 
 
-//²éÑ¯
+//æŸ¥è¯¢ç»“æžœ
 int ZRedisConnection::query(unsigned int uin, MMOnlineRedisResult_t& result)
 {
 	string strKey = "onRedisLine_"+ to_string(uin);	
@@ -300,7 +298,7 @@ int ZRedisConnection::query(unsigned int uin, MMOnlineRedisResult_t& result)
 }
 
 
-//¸üÐÂ
+//æ›´æ–°ç»“æžœ
 int ZRedisConnection::update(unsigned int uin, const MMOnlineRedisResult_t& result)
 {
 	string strKey = "onRedisLine_"+ to_string(uin);
