@@ -15,7 +15,7 @@
 #include "zRedisConnection.h"
 #include "hiredis_cluster/hircluster.h"
 #include "cipherEncryptor.h"
-#include "iLog.h"
+#include "logger.h"
 
 using namespace std;
 using namespace Comm;
@@ -52,7 +52,7 @@ bool ZRedisConnection::Connect()
     redisClusterConnect2(m_pContext);
     if (m_pContext && m_pContext->err) 
 	{
-       LogErr("Error: %s", m_pContext->errstr);
+       LOGERR("Error: %s", m_pContext->errstr);
 	   return false;
     }
 	return true;
@@ -74,7 +74,7 @@ bool ZRedisConnection::hmset(const string& key,const std::map<std::string,string
 	std::string cmd = ss.str();
 	cout<<cmd<<endl;
 	
-	LogInfo("HMSET: %s", cmd.c_str());
+	LOGINFO("HMSET: %s", cmd.c_str());
 	
 	redisReply *reply = (redisReply *)redisClusterCommand(m_pContext, cmd.c_str());
 	if(CheckReply(reply))
@@ -104,7 +104,7 @@ bool ZRedisConnection::hmget(const string& key, const vector<string>&fileds, vec
 		ss << (*iter) << " ";
     }
 	std::string cmd = ss.str();
-	LogInfo("HMGET: %s", cmd.c_str());
+	LOGINFO("HMGET: %s", cmd.c_str());
 	redisReply *reply = (redisReply *)redisClusterCommand(m_pContext, cmd.c_str());
 	if(CheckReply(reply))
 	{
@@ -284,7 +284,7 @@ bool ZRedisConnection::query(unsigned int uin, MMOnlineRedisResult_t& result)
 	vector<string>values;
 	if(!hmget(strKey, fileds, values))
 	{
-		LogErr("hmget strKey:%s failed", strKey.c_str());
+		LOGERR("hmget strKey:%s failed", strKey.c_str());
 		return false;
 	}
 	
@@ -295,7 +295,7 @@ bool ZRedisConnection::query(unsigned int uin, MMOnlineRedisResult_t& result)
     result.strDeviceId   = values[4];
 	result.strClientPort = values[5];
 	
-	LogInfo("query %s:%s,%s,%s,%s,%s,%s\n",strKey.c_str(), result.strFlag.c_str(), result.strClientId.c_str(), result.strClientIp.c_str(),result.strOnlineTime.c_str(),result.strDeviceId.c_str(), result.strClientPort.c_str());
+	LOGINFO("query %s:%s,%s,%s,%s,%s,%s\n",strKey.c_str(), result.strFlag.c_str(), result.strClientId.c_str(), result.strClientIp.c_str(),result.strOnlineTime.c_str(),result.strDeviceId.c_str(), result.strClientPort.c_str());
 	return true;
 }
 
@@ -320,10 +320,10 @@ int ZRedisConnection::update(unsigned int uin, const MMOnlineRedisResult_t& resu
 		{
 			if(result.strFlag == "0")
 			{
-				LogInfo("下线 key:%s, client0：%s,  client1：%s", strKey.c_str(), queryResult.strClientId.c_str(), result.strClientId.c_str());
+				LOGINFO("下线 key:%s, client0：%s,  client1：%s", strKey.c_str(), queryResult.strClientId.c_str(), result.strClientId.c_str());
 				if(queryResult.strClientId.compare(result.strClientId) == 0)
 				{
-					//LogInfo("下线 key:%s,  client1：%s", strKey.c_str(),  result.strClientId.c_str());
+					//LOGINFO("下线 key:%s,  client1：%s", strKey.c_str(),  result.strClientId.c_str());
 					hmset(strKey, mapValue);	
 				}
 

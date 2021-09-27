@@ -12,7 +12,6 @@
 #include "httpProxySvr.h"
 #include <signal.h>
 #include <assert.h>
-#include "Singleton.h"
 #include "iServerConfig.h"
 #include "zRedisConnectionPool.h"
 
@@ -70,17 +69,15 @@ int main(int argc, char** argv) {
 		exit(-1);
 	}
 
-    string strDaemonize =objConfig.GetDaemonize();
+   string strDaemonize =objConfig.GetDaemonize();
+   cout<<strDaemonize<<endl;
 	if(strDaemonize.compare("yes") == 0)
 	{
 		initDaemon();
 	}
 
-
 	RedisCfgInfo redisCfgInfo = objConfig.GetRedisCfgInfo();
-
 	Singleton<ZRedisConnectionPool>::Instance().init(redisCfgInfo);
-	
     try 
 	{
 		  HttpProxyServer server;
@@ -93,10 +90,7 @@ int main(int argc, char** argv) {
     	LOGERR("ERR: mmproxy exit");
     }
 
-
-	Singleton<ZRedisConnectionPool>::Instance().unInit();
-
-    return 0;
+    return 2;
 }
 
 //gzrd_Lib_CPP_Version_ID--start

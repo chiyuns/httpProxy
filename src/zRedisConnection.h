@@ -13,7 +13,7 @@
 #include <map>
 #include <memory>
 #include "Singleton.h"
-#include "mmonlinesvrconfig.h"
+#include "iServerConfig.h"
 #include "hiredis_cluster/hircluster.h"
 
 using namespace std;

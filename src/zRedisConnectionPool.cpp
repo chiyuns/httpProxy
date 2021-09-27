@@ -10,7 +10,7 @@
 #include <thread>
 #include <functional>
 #include <iostream>
-#include "iLog.h"
+#include "logger.h"
 #include "zRedisConnection.h"
 #include "zRedisConnectionPool.h"
 

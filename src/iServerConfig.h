@@ -9,11 +9,12 @@
 struct RedisCfgInfo
 {
 	string       strRedisAddr;
-    string       strRedisPwd;
+    string        strRedisPwd;
 	unsigned     iRedisTimeOut;
 	unsigned     iRedisConNum;
 
 };
+
 
 namespace Comm
 {
