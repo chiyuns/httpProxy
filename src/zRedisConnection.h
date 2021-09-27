@@ -2,7 +2,7 @@
  *
  * File:        OnlineManager.h
  * Author:      iotazhang
- * Revision:    主要是用于redis访问连接池
+ * Revision:    $Id: OnlineManager.h 328249 2012-07-24 07:26:44Z dirkcai $
  * Description: 在线状态管理器, 记录一个mmproxy上所有客户端的在线状态
  *
  ***********************************************************************/
@@ -12,7 +12,8 @@
 #include <vector>
 #include <map>
 #include <memory>
-#include "iServerConfig.h"
+#include "Singleton.h"
+#include "mmonlinesvrconfig.h"
 #include "hiredis_cluster/hircluster.h"
 
 using namespace std;
@@ -31,7 +32,6 @@ class MMOnlineSvrConfig;
 
 class ZRedisConnectionPool;
 
-
 /**
  * 在线状态管理器
  */
@@ -41,13 +41,15 @@ public:
 
     ~ZRedisConnection();
 	
-   
-public:
 
 	bool Connect();
 	
-    int query(unsigned int uin, MMOnlineRedisResult_t& result);
+    bool query(unsigned int uin, MMOnlineRedisResult_t& result);
 
+    /**
+     * 更新状态信息
+     * @param list 状态信息列表
+     */
     int update(unsigned int uin, const MMOnlineRedisResult_t& result);
 	
 	bool hmset(const string& key, const std::map<std::string,string>& value);
@@ -67,7 +69,6 @@ public:
 	void FreeReply(const redisReply* reply);
 
 	bool expire(const std::string& key,  uint32_t second);
-	
 	
 private:
    redisClusterContext *m_pContext;

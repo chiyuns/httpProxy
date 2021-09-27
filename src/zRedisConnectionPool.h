@@ -13,6 +13,7 @@
 #include <mutex>
 #include <vector>
 #include <list>
+#include <condition_variable>   
 
 #include "zRedisConnection.h"
 using namespace std;
@@ -25,7 +26,7 @@ class ZRedisConnectionPool {
 public:
 	bool init(const  RedisCfgInfo& redisCfgInfo);
 	
-	bool unInit();
+	void unInit();
 	
 	ZRedisConnection* Get();
 
@@ -34,8 +35,8 @@ public:
 private:
     std::mutex mtx_;     
 
-	int			m_curConnCnt;
-	int 		m_maxConnCnt;
+	unsigned	m_curConnCnt;
+	unsigned 	m_maxConnCnt;
     std::condition_variable    m_condition;
     list<ZRedisConnection*> 	connect_pool_;
 

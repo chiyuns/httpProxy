@@ -10,14 +10,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sstream>
-#include<iostream>
+#include <iostream>
 #include <unistd.h>
 #include "zRedisConnection.h"
 #include "hiredis_cluster/hircluster.h"
 #include "cipherEncryptor.h"
-#include "logger.h"
+#include "iLog.h"
 
 using namespace std;
+using namespace Comm;
 
 ZRedisConnection::ZRedisConnection(const  RedisCfgInfo& redisCfgInfo)
 {
@@ -51,7 +52,7 @@ bool ZRedisConnection::Connect()
     redisClusterConnect2(m_pContext);
     if (m_pContext && m_pContext->err) 
 	{
-	   LOGERR("Error: %s", m_pContext->errstr);
+       LogErr("Error: %s", m_pContext->errstr);
 	   return false;
     }
 	return true;
@@ -73,7 +74,7 @@ bool ZRedisConnection::hmset(const string& key,const std::map<std::string,string
 	std::string cmd = ss.str();
 	cout<<cmd<<endl;
 	
-	LOGINFO("HMSET: %s\n", cmd.c_str());
+	LogInfo("HMSET: %s", cmd.c_str());
 	
 	redisReply *reply = (redisReply *)redisClusterCommand(m_pContext, cmd.c_str());
 	if(CheckReply(reply))
@@ -103,7 +104,7 @@ bool ZRedisConnection::hmget(const string& key, const vector<string>&fileds, vec
 		ss << (*iter) << " ";
     }
 	std::string cmd = ss.str();
-	LOGINFO("HMGET: %s\n", cmd.c_str());
+	LogInfo("HMGET: %s", cmd.c_str());
 	redisReply *reply = (redisReply *)redisClusterCommand(m_pContext, cmd.c_str());
 	if(CheckReply(reply))
 	{
@@ -217,7 +218,7 @@ bool ZRedisConnection::onlineExists(const string& key)
 
 	}
 	FreeReply(reply);
-	return true;
+	return bRet;
 }
 
 
@@ -242,7 +243,7 @@ bool ZRedisConnection::onlineDel(const string& key)
         }
     } 
     FreeReply(reply);
-	return true;
+	return bRet;
 }
 
 
@@ -268,8 +269,9 @@ bool ZRedisConnection::expire(const std::string& key,  uint32_t second)
 }
 
 
-//查询结果
-int ZRedisConnection::query(unsigned int uin, MMOnlineRedisResult_t& result)
+
+//从redis中获取数据
+bool ZRedisConnection::query(unsigned int uin, MMOnlineRedisResult_t& result)
 {
 	string strKey = "onRedisLine_"+ to_string(uin);	
     vector<string>fileds;
@@ -282,33 +284,66 @@ int ZRedisConnection::query(unsigned int uin, MMOnlineRedisResult_t& result)
 	vector<string>values;
 	if(!hmget(strKey, fileds, values))
 	{
-		LOGERR("hmget strKey:%s failed", strKey.c_str());
-		return -1;
+		LogErr("hmget strKey:%s failed", strKey.c_str());
+		return false;
 	}
 	
 	result.strFlag       = values[0];
 	result.strClientId   = values[1];
 	result.strClientIp   = values[2];
 	result.strOnlineTime = values[3];
-	result.strDeviceId   = values[4];
+    result.strDeviceId   = values[4];
 	result.strClientPort = values[5];
 	
-	LOGINFO("query %s:%s,%s,%s,%s,%s,%s\n",strKey.c_str(), result.strFlag.c_str(), result.strClientId.c_str(), result.strClientIp.c_str(),result.strOnlineTime.c_str(),result.strDeviceId.c_str(), result.strClientPort.c_str());
-	return 0;
+	LogInfo("query %s:%s,%s,%s,%s,%s,%s\n",strKey.c_str(), result.strFlag.c_str(), result.strClientId.c_str(), result.strClientIp.c_str(),result.strOnlineTime.c_str(),result.strDeviceId.c_str(), result.strClientPort.c_str());
+	return true;
 }
 
 
-//更新结果
+//插入数据到redis
 int ZRedisConnection::update(unsigned int uin, const MMOnlineRedisResult_t& result)
 {
+
 	string strKey = "onRedisLine_"+ to_string(uin);
 	std::map<std::string,string> mapValue;
 	mapValue.insert(pair<string, string>("Flag", result.strFlag));  
     mapValue.insert(pair<string, string>("iClientId",  result.strClientId));  
 	mapValue.insert(pair<string, string>("iClientIp",  result.strClientIp));  
 	mapValue.insert(pair<string, string>("iOnlineTime", result.strOnlineTime));  
-	mapValue.insert(pair<string, string>("cDeviceId", result.strDeviceId));  
 	mapValue.insert(pair<string, string>("iClientPort", result.strClientPort));  
-	hmset(strKey, mapValue);
+	//mapValue.insert(pair<string, string>("cDeviceId",   result.strDeviceId));  
+	MMOnlineRedisResult_t  queryResult;
+	bool bRet= query(uin, queryResult);
+	if(bRet)
+	{
+		if(queryResult.strFlag == "1")
+		{
+			if(result.strFlag == "0")
+			{
+				LogInfo("下线 key:%s, client0：%s,  client1：%s", strKey.c_str(), queryResult.strClientId.c_str(), result.strClientId.c_str());
+				if(queryResult.strClientId.compare(result.strClientId) == 0)
+				{
+					//LogInfo("下线 key:%s,  client1：%s", strKey.c_str(),  result.strClientId.c_str());
+					hmset(strKey, mapValue);	
+				}
+
+			}
+			else
+			{
+				hmset(strKey, mapValue);	
+			}
+		}
+		else
+		{
+			hmset(strKey, mapValue);	
+		}
+	
+	}
+	else
+	{
+
+		hmset(strKey, mapValue);
+	}
+	//expire(strKey, REDIS_EXPIRE_TIME);//设置一个过期时间
 	return 0;
 }

@@ -9,12 +9,14 @@
 #include <unistd.h>
 #include <thread>
 #include <functional>
+#include <iostream>
+#include "iLog.h"
 #include "zRedisConnection.h"
 #include "zRedisConnectionPool.h"
-#include "logger.h"
 
 
 using namespace std;
+using namespace Comm;
 
 bool ZRedisConnectionPool::init(const  RedisCfgInfo& redisCfgInfo) 
 {
@@ -41,7 +43,7 @@ bool ZRedisConnectionPool::init(const  RedisCfgInfo& redisCfgInfo)
 }
 
 
-bool ZRedisConnectionPool::unInit()
+void ZRedisConnectionPool::unInit()
 {
 	std::unique_lock<std::mutex> lk(mtx_);
 
@@ -105,5 +107,6 @@ void ZRedisConnectionPool::Back(ZRedisConnection* pCacheConn)
 
 	m_condition.notify_all();
 }
+
 
 
