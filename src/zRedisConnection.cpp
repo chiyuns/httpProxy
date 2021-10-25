@@ -323,10 +323,8 @@ int ZRedisConnection::update(unsigned int uin, const MMOnlineRedisResult_t& resu
 				LOGINFO("下线 key:%s, client0：%s,  client1：%s", strKey.c_str(), queryResult.strClientId.c_str(), result.strClientId.c_str());
 				if(queryResult.strClientId.compare(result.strClientId) == 0)
 				{
-					//LOGINFO("下线 key:%s,  client1：%s", strKey.c_str(),  result.strClientId.c_str());
-					hmset(strKey, mapValue);	
+					onlineDel(strKey);
 				}
-
 			}
 			else
 			{
@@ -341,9 +339,7 @@ int ZRedisConnection::update(unsigned int uin, const MMOnlineRedisResult_t& resu
 	}
 	else
 	{
-
 		hmset(strKey, mapValue);
 	}
-	//expire(strKey, REDIS_EXPIRE_TIME);//设置一个过期时间
 	return 0;
 }
